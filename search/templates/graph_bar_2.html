@@ -1,0 +1,277 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+{% block content %}
+<title>graph visualistion</title>
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+.bar {
+  fill: steelblue;
+}
+
+.bar:hover {
+  stroke: black;
+ stroke-width:2px;
+}
+
+.title {
+  font: bold 14px "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.axis {
+  font: 10px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000000;
+  shape-rendering: crispEdges;
+}
+
+.x.axis path {
+  display: none;
+}
+div.tooltip { 
+    position: absolute;     
+    text-align: center;     
+    width: 300px;          
+    height: 50px;         
+    padding: 8px;       
+    font: 12px sans-serif;    
+    background: lightsteelblue; 
+    border: 0px;    
+    border-radius: 8px;     
+    pointer-events: none;     
+}
+</style>
+<div id="graph_header" align="center"></div>
+<div id = "graph"></div>
+<div id="textDiv"></div>
+<script>
+var headerNames = []
+var margin = {top: 10, right: 80, bottom: 80, left: 90},
+    width = 900 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+
+
+var x = d3.scale.ordinal().rangeRoundBands([0, width], .1, .3);
+var y = d3.scale.linear().range([height, 0]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .outerTickSize(0)
+    .orient("bottom");
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left")
+    .ticks(8);
+
+var div = d3.select("#graph").append("div") 
+    .attr("class", "tooltip")       
+    .style("opacity", 0);
+
+var svg = d3.select("#graph")
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+d3.csv("{% static "data/converted_data.csv" %}", type, function(error, data) {
+   headerNames = d3.keys(data[0]);
+  console.log(headerNames);
+ 
+  if(data.length>10){
+    new_data=[];
+    for(var i=0; i<10; i++){
+      new_data.push(data[i])
+  }
+  data=new_data;
+  }
+
+ x.domain(data.map(function(d) { return d[headerNames[0]]; }));
+ var max_val = d3.max(data, function(d) { return +d[headerNames[1]]; })
+  y.domain([0, max_val]);
+  svg.append("text")
+      .attr("class", "title")
+      .attr("x", x(data[0][headerNames[0]]))
+      .attr("y", -26);
+
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+      .selectAll(".tick text")
+      .call(wrap, x.rangeBand());
+
+if(headerNames[1]=="Quantity"){
+  var ytext="Quantity(#)";}
+else if(headerNames[1]=="revenue"){
+  var ytext="revenue($)";
+}
+
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+      .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y",10)
+      .attr("x",-height/2 + 20)
+      .attr("dy", "-3em")
+      .style("text-anchor", "end")
+      .style("font-size","20px")
+      .text(ytext);
+
+  svg.selectAll(".bar")
+      .data(data)
+      .enter()
+      .append("rect")
+      .attr("class", "bar")
+      .attr("x", function(d) { return x(d[headerNames[0]]); })
+      .attr("width", x.rangeBand())
+      .attr("y", function(d) { return height; })
+      .attr("height",0)
+      .on("mouseover", function(d) {    
+            div.transition()    
+                .duration(200)    
+                .style("opacity", .9);    
+            div .html((d[headerNames[0]]) + "<br/>"+headerNames[1]+": $" + (+d[headerNames[1]]).toFixed(2))  
+                .style("left", (d3.event.pageX) + "px")   
+                .style("top", (d3.event.pageY - 28) + "px");  
+            })          
+        .on("mouseout", function(d) {   
+            div.transition()    
+                .duration(500)    
+                .style("opacity", 0); 
+        })
+      .transition().duration(2000)
+      .attr("y", function(d) { return y(d[headerNames[1]]); })
+      .attr("height", function(d) { return height - y(d[headerNames[1]]); })
+      ;
+
+var graph_header=d3.select("#graph_header");
+  graph_header.append("text")
+      .style("text-anchor", "end")
+      .style("font-size","40px")
+      .style("font-weight","bold")
+      .text(headerNames[0]+"  vs  " +headerNames[1]);
+
+       // tabulate(data, [headerNames[0],headerNames[1]]); // 2 column table
+
+var total_value=0,percent_value_3=0,total_value_3=0;
+for(var j=0;j<data.length;j++){
+  total_value=total_value+(+data[j][headerNames[1]]);
+}
+for(var j=0;j<3;j++){
+  total_value_3=total_value_3+(+data[j][headerNames[1]]);
+}
+percent_value_3=(total_value_3/total_value)*100;
+percent_value_3=Math.round(percent_value_3);
+console.log(total_value, percent_value_3)
+
+var percent_value_upto_limit=0,count=0,total_value_upto_limit=0;
+while(percent_value_upto_limit<80){
+  console.log(total_value_upto_limit)
+  total_value_upto_limit=total_value_upto_limit+(+data[count][headerNames[1]]);
+  percent_value_upto_limit=(total_value_upto_limit/total_value)*100
+  console.log(percent_value_upto_limit)
+  count=count+1;
+}
+d3.select("#text_content").remove()
+if(headerNames[0]=="Description"){
+  header="Product";
+}
+
+var top_data_length;
+if(data.lenght<=3){
+  var top_data_length=data.lenght;
+}
+else{
+  top_data_length=3;
+}
+
+// console.log("filter_data[0][headerNames[2]]",filter_data[0][headerNames[2]])
+var top_bottom='';
+if (+data[0][headerNames[1]]> +data[1][headerNames[1]]) {
+  top_bottom="Top";
+}
+else if(+data[0][headerNames[1]]< +data[1][headerNames[1]]) {
+  top_bottom="Bottom";
+}
+var textDiv=d3.select("#textDiv");
+    textDiv.append("text")
+        .attr("id","text_content")
+       .style("font-size","25px")
+       .text([top_bottom+ " "+top_data_length +" entries contribute "+percent_value_3+"% of total  of the total "+headerNames[2]+". "+count+" entries contribute to 80% of revenue"]);
+       // .text([top_bottom+ " "+top_data_length+" "+headerNames[0]+" contribute "+percent_value_3+"% of total  of the total "+headerNames[1]+". It consist of " +top_bottom+ " "+count+" products to complete more than 80% of revenue"]);
+  
+});
+
+
+function tabulate(data, columns) {
+  var table = d3.select('body').append('table');
+  var thead = table.append('thead');
+  var tbody = table.append('tbody');
+
+  // append the header row
+  thead.append('tr')
+    .selectAll('th')
+    .data(columns).enter()
+    .append('th')
+      .text(function (column) { return column; });
+
+  // create a row for each object in the data
+  var rows = tbody.selectAll('tr')
+    .data(data)
+    .enter()
+    .append('tr');
+
+  // create a cell in each row for each column
+  var cells = rows.selectAll('td')
+    .data(function (row) {
+      return columns.map(function (column) {
+        return {column: column, value: row[column]};
+      });
+    })
+    .enter()
+    .append('td')
+      .text(function (d) { return d.value ; });
+
+  return table;
+}
+
+
+function wrap(text, width) {
+  text.each(function() {
+    var text = d3.select(this),
+        words = text.text().split(/\s+/).reverse(),
+        word,
+        line = [],
+        lineNumber = 0,
+        lineHeight = 1.1, // ems
+        y = text.attr("y"),
+        dy = parseFloat(text.attr("dy")),
+        tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+    while (word = words.pop()) {
+      line.push(word);
+      tspan.text(line.join(" "));
+      if (tspan.node().getComputedTextLength() > width) {
+        line.pop();
+        tspan.text(line.join(" "));
+        line = [word];
+        tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+      }
+    }
+  });
+}
+function type(d) {
+  d[headerNames[1]] = +d[headerNames[1]];
+  return d;
+}
+
+</script>
+{% endblock %}

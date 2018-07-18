@@ -1,0 +1,342 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+{% block content %}
+<style> /* set the CSS */
+
+body { font: 12px Arial;}
+ 
+path { 
+  stroke: steelblue;
+  stroke-width: 2;
+  fill: none;
+}
+ 
+.axis path,
+.axis line {
+  fill: none;
+  stroke: grey;
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+div.tooltip { 
+    position: absolute;     
+    text-align: center;     
+    width: 120px;          
+    height: 45px;         
+    padding: 8px;       
+    font: 12px sans-serif;    
+    background: lightsteelblue; 
+    border: 0px;    
+    border-radius: 8px;     
+    pointer-events: none;     
+}
+ 
+</style>
+    <div class="filter_box">
+<select id="filter_on_data" onchange = "filter_on_country()">
+
+</select>
+</div>
+<div id="graph_header" align="center"></div>
+<div id = "graph"></div>
+<div id="textDiv"></div>
+<body>
+  
+<script>
+var div = d3.select("body").append("div") 
+    .attr("class", "tooltip")       
+    .style("opacity", 0);
+var headerNames=[];
+var globaldata;
+// Set the dimensions of the canvas / graph
+var margin = {top: 30, right: 20, bottom: 30, left: 90},
+  width = 600 - margin.left - margin.right,
+  height = 450 - margin.top - margin.bottom;
+
+// Parse the date / time
+// var parseDate = d3.time.format("%y").parse;
+
+// Set the ranges
+//var x = d3.time.scale().range([0, width]);
+
+var x = d3.scale.ordinal().rangeRoundBands([0, width]);
+
+
+
+var y = d3.scale.linear().range([height, 0]);
+
+// Define the axes
+var xAxis = d3.svg.axis().scale(x).orient("bottom");
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left");
+    //.ticks(8);
+
+// Define the line
+var valueline = d3.svg.line()
+  .x(function(d) { return x(d[headerNames[0]]); })
+  .y(function(d) { return y(d[headerNames[2]]); });
+
+d3.csv("{%static "data/converted_data.csv" %}", function(error, data) {
+   headerNames = d3.keys(data[0]);
+  var unique_val = d3.nest()
+            .key(function(d) { return d[headerNames[1]]; })
+            .entries(data);
+
+var a;
+console.log(data,"initial");
+  var filter_on_data = d3.select("#filter_on_data");
+  filter_on_data.selectAll(".filter")
+                .data(unique_val)
+                .enter()
+                .append("option")
+                .attr("class","filter")
+                .attr("value",function(d){return d.key;})
+                .text(function(d){a=d.key; return d.key;});
+  globaldata = data;
+  start(data);
+
+});
+
+function start(data) {
+    var headerNames = d3.keys(data[0]);
+    d3.select("#graph")
+        .select("svg")
+        .remove();
+
+    var sel = document.getElementById('filter_on_data');
+    console.log("data before filter",data,sel.options[sel.selectedIndex].value);
+    var filter_data = data.filter(function (d) {return d[headerNames[1]] == sel.options[sel.selectedIndex].value});
+
+
+    d3.select("#header_text").remove();
+
+     var graph_header=d3.select("#graph_header");
+    graph_header.append("text")
+          .attr("id","header_text")
+          .style("text-anchor", "end")
+          .style("font-size","30px")
+          .text("Trend of " + sel.options[sel.selectedIndex].value);
+
+    if (filter_data.length >= 10) {
+        var new_filter_data = [];
+        for (var i = 0; i < 10; i++) {
+
+            new_filter_data.push(filter_data[i])
+        }
+        filter_data = new_filter_data;
+    }
+    x.domain(filter_data.map(function(d) { return d[headerNames[0]];}));
+    var min_val = d3.min(filter_data, function(d) {return +d[headerNames[2]]; })
+    var max_val = d3.max(filter_data, function(d) { return +d[headerNames[2]]; })
+  y.domain([min_val,max_val]);
+
+  var svg = d3.select("#graph")
+  .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var textDiv=d3.select("#textDiv")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom);
+
+  svg.append("path")
+    .attr("class", "line")
+    .attr("d", valueline(filter_data));
+
+  svg.append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(xAxis);
+if(headerNames[2]=="Quantity"){
+  var ytext="Quantity: #";}
+else if(headerNames[2]=="revenue"){
+  var ytext="revenue: $";
+}
+
+  svg.selectAll("dot") 
+        .data(filter_data)     
+    .enter().append("circle")               
+        .attr("r", 5)   
+        .attr("cx", function(d) { return x(d[headerNames[0]]); })     
+        .attr("cy", function(d) { return y(d[headerNames[2]]); })   
+        .on("mouseover", function(d) {    
+            div.transition()    
+                .duration(200)    
+                .style("opacity", .9);    
+            div .html(headerNames[0]+"  "+(+d[headerNames[0]])+ "<br/>" +ytext+"" +d[headerNames[2]])   
+                .style("left", (d3.event.pageX) + "px")   
+                .style("top", (d3.event.pageY - 28) + "px");  
+            })          
+        .on("mouseout", function(d) {   
+            div.transition()    
+                .duration(500)    
+                .style("opacity", 0); 
+        });
+
+  // Add the Y Axis
+  svg.append("g")
+    .attr("class", "y axis")
+    .call(yAxis)
+    .append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("y", 3)
+    .attr("dy", "-2em")
+    .style("text-anchor", "end")
+    .style("font-size","30px")
+    .text(ytext);
+
+for(var j=0;j<filter_data.length;j++){
+if(+filter_data[j][headerNames[2]]==max_val){
+  var max_val_year=filter_data[j][headerNames[0]];
+}
+else if(+filter_data[j][headerNames[2]]==min_val){
+  var min_val_year=filter_data[j][headerNames[0]];
+}
+}
+
+d3.select("table")
+          .remove();
+
+var growth_YoY=[],YoY=[];   
+      var table_data=[];
+      for(var i=0;i<filter_data.length;i++){
+        if(i==0){
+          YoY.push(0);
+            growth_YoY.push("----");
+        }
+        else{
+           YoY.push(+(((+filter_data[i][headerNames[2]])-(+filter_data[i-1][headerNames[2]]))/
+            (+filter_data[i-1][headerNames[2]])*100).toFixed(2));
+          growth_YoY.push(YoY[i]+"%")
+        }console.log(YoY[i]);
+        var tr = ""
+        if (YoY[i] == 0){
+          tr = "no"
+        }
+        else if (YoY[i] < 0){
+            tr = "down"
+        }
+        else{
+          tr = "up"
+        }
+    table_data.push({Year: filter_data[i][headerNames[0]],growth_YoY:growth_YoY[i], trend : tr});
+
+var count_pos=0,YoY_statement,count_neg=0;
+console.log("Yoy",YoY)
+var lenght_YoY=YoY.length;
+var looping=lenght_YoY;
+console.log(lenght_YoY,"lenght_YoY")
+if (looping>=3){
+  while(YoY[looping-1]>=0 && looping>0){
+    count_pos=count_pos+1;
+    looping=looping-1;
+  }
+  looping=lenght_YoY;
+  while(YoY[looping-1]<=0 && looping>0){
+    count_neg=count_neg+1;
+    looping=looping-1;
+  }
+}
+if(count_pos>=2){
+  YoY_statement="an increasing trending";
+}
+else if(count_neg>=2){
+  YoY_statement="an decreasing trending";
+}
+else if(count_neg==0 && count_pos==0){
+  YoY_statement=" Insufficient data for showing any trending for the data";
+}
+else{
+  YoY_statement="Not showing any trend";
+}
+
+d3.select("#text_content").remove()
+var textDiv=d3.select("#textDiv");
+    textDiv.append("text")
+    .attr("id","text_content")
+       .style("font-size","20px")
+       .style("text-align","left")
+       .text([YoY_statement]);
+
+
+}
+
+      console.log(table_data,"table_data");
+    tabulate(table_data, [headerNames[0],"growth_YoY","trend"]);
+
+}
+
+
+    function tabulate(table_data, columns) {
+  var table = d3.select('body').append('table');
+  var thead = table.append('thead');
+  var tbody = table.append('tbody');
+
+  // append the header row
+  thead.append('tr')
+    .selectAll('th')
+    .data(columns).enter()
+    .append('th')
+      .text(function (column) { return column; });
+
+  // create a row for each object in the data
+  var rows = tbody.selectAll('tr')
+    .data(table_data)
+    .enter()
+    .append('tr');
+
+  // create a cell in each row for each column
+  var cells = rows.selectAll('td')
+    .data(function (row) {
+      return columns.map(function (column) {
+        return {column: column, value: row[column]};
+      });
+    })
+    .enter()
+    .append('td')
+    .attr("id",function(d){ if (d.column == "trend"){
+                                  if(d.value == "up"){
+                                    return "up";
+                                  }
+                                  else if(d.value == "down"){
+                                      return "down";
+                                  }
+                                  else{
+                                    return "no";
+                                  }
+    }})
+      .text(function (d) { if (d.column == "trend"){
+                                  if(d.value == "up"){
+                                    return "";
+                                  }
+                                  else if(d.value == "down"){
+                                      return "";
+                                  }
+                                  else{
+                                    return "no";
+                                  }
+                            }
+                            else{
+                              return d.value;
+                            }
+  });
+
+        console.log(d3.selectAll("#no")[0][0])
+   // d3.selectAll("#no")[0][0].innerHtml=""
+    d3.selectAll("#up").append("img").attr("src","{%  static 'stuff/up.png' %}")
+    d3.selectAll("#down").append("img").attr("src","{%  static 'stuff/down.png' %}")
+      console.log(d3.selectAll("#up")[0][0])
+  return table;
+}
+ function filter_on_country(){
+  start(globaldata);
+}
+
+</script>
+</body>
+{% endblock %}

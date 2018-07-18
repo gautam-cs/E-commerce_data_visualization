@@ -1,0 +1,95 @@
+MATCH(n) DETACH DELETE n;
+
+
+MATCH (n) RETURN n;
+
+
+LOAD CSV WITH HEADERS FROM   
+'file:///samplework.csv' as line
+CREATE (Customer:customerid {Country:line.Country,CustomerID: line.CustomerID})-
+[r:bought_this{Price:line.UnitPrice,InvoiceNo:line.InvoiceNo,Quantity:line.Quantity,Date:line.Date,Time:line.Time}]->
+(Product:stockcode{Description:line.Description,StrockCode:line.StockCode})
+
+
+LOAD CSV WITH HEADERS FROM   
+'file:///Samplework100rows.csv' as line
+Merge (CustomerID:customerid {Country:line.Country,CustomerID1: line.CustomerID})
+Merge (Product:stockcode{Description:line.Description,StrockCode:line.StockCode})
+*********************************************actual database execute steps*****************************************************************************
+STEP 1:
+USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS FROM   
+'file:///unique_CustomerID.csv' as line
+CREATE (:customerid {CustomerID: line.CustomerID})
+
+STEP 2:
+USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS FROM   
+'file:///unique_StockCode.csv' as line
+CREATE (:stockcode{Description:line.Description,StockCode:line.StockCode})
+
+STEP 3:
+
+CREATE INDEX ON :customerid(CustomerID);
+
+STEP 4:
+
+CREATE INDEX ON :stockcode(StockCode);
+
+STEP 5:
+USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS FROM   
+'file:///finaldataset1.csv' as line
+Match (Customerid:customerid{CustomerID: line.CustomerID})
+Match (Product:stockcode{Description:line.Description,StockCode:line.StockCode})
+MERGE (Customerid)-[r:Bought_this{Price:line.UnitPrice,Country:line.Country,InvoiceNo:line.InvoiceNo,Quantity:line.Quantity,Date:line.Date,Time:line.Time}]->(Product)
+*******************************************************************************************************************************************************
+LOAD CSV WITH HEADERS FROM   
+'file:///Samplework100rows.csv' as line
+Match (CustomerID:customerid{Country:line.Country,CustomerID1: line.CustomerID})
+Match (Product:stockcode{Description:line.Description,StrockCode:line.StockCode})
+MERGE (CustomerID)-[r:Bought_this{Price:line.UnitPrice,InvoiceNo:line.InvoiceNo,Quantity:line.Quantity,Date:line.Date,Time:line.Time}]->(Product)
+MATCH (n) RETURN n;
+
+LOAD CSV WITH HEADERS FROM   
+'file:///samplework.csv' as line
+Merge (CustomerID:customerid {Country:line.Country,CustomerID1: line.CustomerID})
+Merge (Product:stockcode{Description:line.Description,StrockCode:line.StockCode})
+LOAD CSV WITH HEADERS FROM   
+'file:///samplework.csv' as line
+Match (CustomerID:customerid{Country:line.Country,CustomerID1:line.CustomerID})
+Match (Product:stockcode{Description:line.Description,StrockCode:line.StockCode})
+MERGE (CustomerID)-[r:Bought_this{Price:line.UnitPrice,InvoiceNo:line.InvoiceNo,Quantity:line.Quantity,Date:line.Date,Time:line.Time}]->(Product)
+
+MATCH (CustomerID:customerid)-[r:Bought_this]->(Product:stockcode) 
+RETURN  CustomerID.Country,Product.StrockCode,r.Quantity
+ORDER BY r.Quantity
+LIMIT 100;
+******************************important(top customers with list of quantity)********************************
+match (c:customerid)-[r:Bought_this]->(s:stockcode)
+set r.Quantity=toInteger(r.Quantity)
+return c.CustomerID1 as customer_name , collect(Distinct r.Quantity) as quantity
+order by customer_name, quantity desc limit 1000
+******************************important(Top customers)********************************
+match (c:customerid)-[r:Bought_this]->(s:stockcode)
+set r.Quantity=toInteger(r.Quantity)
+return c.CustomerID1 as customer_name , reduce(sum=0,i in collect(r.Quantity)|sum+i) as quantity
+order by customer_name, quantity desc limit 1000
+******************************important(Top countries by revenue)********************************
+match (c:customerid)-[r:Bought_this]->(s:stockcode)
+set r.Quantity=toInteger(r.Quantity),r.Price=toFloat(r.Price)
+return c.Country as country , reduce(sum=0,i in collect(r.Quantity*r.Price)|sum+i) as quantity
+order by country, quantity desc limit 1000
+******************************important(top products in country by revenue)********************************
+match (c:customerid)-[r:Bought_this]->(s:stockcode)
+set r.Quantity=toInteger(r.Quantity),r.Price=toFloat(r.Price)
+return c.Country as country , reduce(sum=0,i in collect(r.Quantity*r.Price)|sum+i) as revenue,s.StrockCode
+order by c.Country,revenue desc limit 1000
+##################
+match (c:customerid)-[r:Bought_this]->(s:stockcode)
+set r.Quantity=toInteger(r.Quantity)
+return s.StockCode as StockCode ,reduce(sum=0,i in collect(r.Quantity)|sum+i) as quantity, collect( r.Quantity) as cquantity
+order by  quantity desc
+##################
+
+match (n:CustomerID) Remove n.Country

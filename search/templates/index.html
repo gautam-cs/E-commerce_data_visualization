@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+{% block content %}
+<body background="{%  static 'stuff/backgroung.jpg' %}" background-size="15%" >
+<style type="text/css"></style>
+<title>Homepage</title>
+    <div class="any" id = "division" >
+      <div id="loading" ><img src="{%  static 'stuff/loader.gif' %}" height = "400px"></img><br/><div id = "disp">Processing...</div></div>
+        <form method="POST" class="wrapper">
+            {% csrf_token %}
+        <h2>Write your query</h2><br>
+    <label for="tags"> </label>
+        <input  id="tags"  name="query"  placeholder="Ex- Top products by sales, top products by qunatity by location" size="65" required>
+        <button class="btn btn-default login-btn"  type="submit" onclick="abc()" >submit</button>
+             </form>
+     
+
+    <div class="response">
+    <p><h3>{{bot_output}} </h3></p>
+        {#    <p><h1>{{input_statement}}</h1></p>#}
+    </div>
+    <div class="sample"><a href="/sample"><h4>sample queries</h4></a></div>
+    </div>
+
+    <script type="text/javascript">
+
+      $(document).ready(function(){
+        $("#loading").hide();
+      });
+
+
+            list = {{ list|safe }}
+    $( function() {
+    function split( val ) {
+      console.log("val is ",val);
+      return val.split( / \s*/ );
+    }
+    function extractLast( term ) {
+      console.log(split( term ).pop())
+      return split( term ).pop();
+    }
+ 
+    $( "#tags" )
+      // don't navigate away from the field on tab when selecting an item
+      .on( "keydown", function( event ) {
+        if ( event.keyCode === $.ui.keyCode.TAB && $( this ).autocomplete( "instance" ).menu.active ) {
+          console.log(this)
+          event.preventDefault();
+        }
+      })
+      .autocomplete({
+        minLength: 2,
+        source: function( request, response ) {          
+          // delegate back to autocomplete, but extract the last term
+          response( $.ui.autocomplete.filter(list, extractLast(request.term)));
+        },
+        focus: function() {
+          // prevent value inserted on focus
+          return false;
+        },
+        select: function( event, ui ) {
+          var terms = split( this.value );
+          console.log(terms);
+          // remove the current input
+          terms.pop();
+          // add the selected item
+          terms.push( ui.item.value );
+          // add placeholder to get the comma-and-space at the end
+          terms.push( "" );
+          this.value = terms.join( " " );
+          return false;
+        }
+      });
+  });
+
+   function abc(){
+    //d3.select("#division").remove();
+    $("#loading").show();
+   }
+  </script>
+  </body>
+  
+    
+{% endblock %}
